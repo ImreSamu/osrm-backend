@@ -27,6 +27,12 @@ inline std::pair<bool, bool> boolPairAnd(const std::pair<bool, bool> &A,
 {
     return std::make_pair(A.first && B.first, A.second && B.second);
 }
+inline std::pair<bool, bool> boolPairAnd(const std::pair<bool, bool> &A,
+                                         const std::pair<bool, bool> &B,
+                                         const std::pair<bool, bool> &C)
+{
+    return std::make_pair(A.first && B.first && C.first, A.second && B.second && C.second);
+}
 
 // Implements complex queries on top of an RTree and builds PhantomNodes from it.
 //
@@ -53,13 +59,16 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
     std::vector<PhantomNodeWithDistance>
     NearestPhantomNodesInRange(const util::Coordinate input_coordinate,
                                const double max_distance,
-                               const Approach approach) const
+                               const Approach approach,
+                               const bool use_all_edges = false) const
     {
         auto results = rtree.Nearest(
             input_coordinate,
-            [this, approach, &input_coordinate](const CandidateSegment &segment) {
-                return boolPairAnd(boolPairAnd(HasValidEdge(segment), CheckSegmentExclude(segment)),
-                                   CheckApproach(input_coordinate, segment, approach));
+            [this, approach, &input_coordinate, use_all_edges](const CandidateSegment &segment) {
+                return boolPairAnd(
+                    boolPairAnd(HasValidEdge(segment), CheckSegmentExclude(segment)),
+                    boolPairAnd(CheckSnappable(segment, use_all_edges),
+                                CheckApproach(input_coordinate, segment, approach)));
             },
             [this, max_distance, input_coordinate](const std::size_t,
                                                    const CandidateSegment &segment) {
@@ -76,14 +85,16 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
                                const double max_distance,
                                const int bearing,
                                const int bearing_range,
-                               const Approach approach) const
+                               const Approach approach,
+                               const bool use_all_edges = false) const
     {
         auto results = rtree.Nearest(
             input_coordinate,
-            [this, approach, &input_coordinate, bearing, bearing_range](
+            [this, approach, &input_coordinate, bearing, bearing_range, use_all_edges](
                 const CandidateSegment &segment) {
                 auto use_direction =
-                    boolPairAnd(CheckSegmentBearing(segment, bearing, bearing_range),
+                    boolPairAnd(boolPairAnd(CheckSnappable(segment, use_all_edges),
+                                            CheckSegmentBearing(segment, bearing, bearing_range)),
                                 boolPairAnd(HasValidEdge(segment), CheckSegmentExclude(segment)));
                 use_direction =
                     boolPairAnd(use_direction, CheckApproach(input_coordinate, segment, approach));
@@ -620,6 +631,18 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
                 std::round(backward_edge_bearing), filter_bearing, filter_bearing_range) &&
             segment.data.reverse_segment_id.enabled;
         return std::make_pair(forward_bearing_valid, backward_bearing_valid);
+    }
+
+    std::pair<bool, bool> CheckSnappable(const CandidateSegment &segment,
+                                                const bool use_all_edges) const
+    {
+
+        const bool forward_segment_snappable = segment.data.forward_segment_id.enabled &&
+                                           (segment.data.is_startpoint || use_all_edges);
+        const bool reverse_segment_snappable = segment.data.reverse_segment_id.enabled &&
+                                           (segment.data.is_startpoint || use_all_edges);
+
+        return std::make_pair(forward_segment_snappable, reverse_segment_snappable);
     }
 
     /**
