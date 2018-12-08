@@ -65,10 +65,9 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
         auto results = rtree.Nearest(
             input_coordinate,
             [this, approach, &input_coordinate, use_all_edges](const CandidateSegment &segment) {
-                return boolPairAnd(
-                    boolPairAnd(HasValidEdge(segment), CheckSegmentExclude(segment)),
-                    boolPairAnd(CheckSnappable(segment, use_all_edges),
-                                CheckApproach(input_coordinate, segment, approach)));
+                return boolPairAnd(boolPairAnd(HasValidEdge(segment), CheckSegmentExclude(segment)),
+                                   boolPairAnd(CheckSnappable(segment, use_all_edges),
+                                               CheckApproach(input_coordinate, segment, approach)));
             },
             [this, max_distance, input_coordinate](const std::size_t,
                                                    const CandidateSegment &segment) {
@@ -634,13 +633,13 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
     }
 
     std::pair<bool, bool> CheckSnappable(const CandidateSegment &segment,
-                                                const bool use_all_edges) const
+                                         const bool use_all_edges) const
     {
 
         const bool forward_segment_snappable = segment.data.forward_segment_id.enabled &&
-                                           (segment.data.is_startpoint || use_all_edges);
+                                               (segment.data.is_startpoint || use_all_edges);
         const bool reverse_segment_snappable = segment.data.reverse_segment_id.enabled &&
-                                           (segment.data.is_startpoint || use_all_edges);
+                                               (segment.data.is_startpoint || use_all_edges);
 
         return std::make_pair(forward_segment_snappable, reverse_segment_snappable);
     }
